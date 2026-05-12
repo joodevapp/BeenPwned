@@ -1,0 +1,42 @@
+name: Update HIBP Stats
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 매주 일요일 자동 실행
+  workflow_dispatch:  # 수동 실행도 가능
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Fetch HIBP Stats
+        run: |
+          python3 - <<'EOF'
+          import urllib.request
+          import json
+          
+          req = urllib.request.Request(
+            'https://haveibeenpwned.com/api/v3/breaches',
+            headers={'user-agent': 'BreachCheck'}
+          )
+          with urllib.request.urlopen(req) as r:
+            breaches = json.loads(r.read())
+          
+          stats = {
+            "breach_count": len(breaches),
+            "pwned_accounts": sum(b.get('PwnCount', 0) for b in breaches)
+          }
+          
+          with open('stats.json', 'w') as f:
+            json.dump(stats, f)
+          EOF
+      
+      - name: Commit
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add stats.json
+          git commit -m "Update stats" || exit 0
+          git push
